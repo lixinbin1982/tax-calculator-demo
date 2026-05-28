@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="author" content="Ben Li">
 <title>Cross-Border Tax Calculator Demo</title>
-<script src="https://www.paypal.com/sdk/js?client-id=AVJ64pXVas3BtB-YrVVMFfCAZx2r2RlEjn0TwRtpGGNxqhhR-DRILDWX8gONSh-jSgunDQucOrVplXtm&currency=USD&intent=capture"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -161,26 +160,6 @@
       <button class="calc-btn" onclick="calculate()">Calculate Tax</button>
       <div class="status-bar"><div class="dot"></div>Live calculation · rates updated 2025</div>
     </div>
-
-    <div class="card result-card" id="paypal-section" style="margin-top:20px;display:none">
-      <div class="card-title">💳 Pay with PayPal</div>
-      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:16px">Complete your order of <strong id="paypalAmount">$0.00</strong> via PayPal</p>
-      <div id="paypal-button-container"></div>
-    </div>
-
-    <div class="card api-console">
-      <div class="card-title">API Request Preview</div>
-      <div class="api-tabs">
-        <div class="api-tab active" onclick="switchApiTab('request', this)">Request</div>
-        <div class="api-tab" onclick="switchApiTab('response', this)">Response</div>
-        <div class="api-tab" onclick="switchApiTab('avalara', this)">Avalara SDK</div>
-        <div class="api-tab" onclick="switchApiTab('taxjar', this)">TaxJar SDK</div>
-      </div>
-      <div id="pane-request" class="api-pane active"><pre id="apiRequest"></pre></div>
-      <div id="pane-response" class="api-pane"><pre id="apiResponse"></pre></div>
-      <div id="pane-avalara" class="api-pane"><pre id="apiAvalara"></pre></div>
-      <div id="pane-taxjar" class="api-pane"><pre id="apiTaxjar"></pre></div>
-    </div>
   </div>
 
   <div>
@@ -190,10 +169,18 @@
       <div class="result-rows" id="resultRows"></div>
       <div class="breakdown" id="breakdown"></div>
     </div>
+
+    <div class="card result-card" id="paypal-section" style="margin-top:20px;display:none">
+      <div class="card-title">💳 Pay with PayPal</div>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:16px">Complete your order of <strong id="paypal-total">$0.00</strong> via PayPal</p>
+      <div id="paypal-button-container"><div id="paypal-loader" style="text-align:center;padding:20px;color:var(--muted)">Loading PayPal...</div></div>
+      <div id="pp-status" style="margin-top:12px"></div>
+    </div>
   </div>
 </div>
 
 <script>
+// US Sales Tax data
 const US_STATES = {
   AL:{name:'Alabama',state:4,county:5,city:0},
   AK:{name:'Alaska',state:0,county:1.76,city:0},
@@ -248,65 +235,66 @@ const US_STATES = {
   DC:{name:'Washington DC',state:6,county:0,city:0}
 };
 
+// EU VAT data
 const EU_COUNTRIES = {
-  AT:{name:'Austria 🇦🇹',standard:20,reduced:10},
-  BE:{name:'Belgium 🇧🇪',standard:21,reduced:6},
-  BG:{name:'Bulgaria 🇧🇬',standard:20,reduced:9},
-  CY:{name:'Cyprus 🇨🇾',standard:19,reduced:5},
-  CZ:{name:'Czech Republic 🇨🇿',standard:21,reduced:12},
-  DE:{name:'Germany 🇩🇪',standard:19,reduced:7},
-  DK:{name:'Denmark 🇩🇰',standard:25,reduced:0},
-  EE:{name:'Estonia 🇪🇪',standard:22,reduced:9},
-  ES:{name:'Spain 🇪🇸',standard:21,reduced:10},
-  FI:{name:'Finland 🇫🇮',standard:25.5,reduced:14},
-  FR:{name:'France 🇫🇷',standard:20,reduced:10},
-  GR:{name:'Greece 🇬🇷',standard:24,reduced:13},
-  HR:{name:'Croatia 🇭🇷',standard:25,reduced:13},
-  HU:{name:'Hungary 🇭🇺',standard:27,reduced:18},
-  IE:{name:'Ireland 🇮🇪',standard:23,reduced:13.5},
-  IT:{name:'Italy 🇮🇹',standard:22,reduced:10},
-  LT:{name:'Lithuania 🇱🇹',standard:21,reduced:9},
-  LU:{name:'Luxembourg 🇱🇺',standard:17,reduced:8},
-  LV:{name:'Latvia 🇱🇻',standard:21,reduced:12},
-  MT:{name:'Malta 🇲🇹',standard:18,reduced:5},
-  NL:{name:'Netherlands 🇳🇱',standard:21,reduced:9},
-  PL:{name:'Poland 🇵🇱',standard:23,reduced:8},
-  PT:{name:'Portugal 🇵🇹',standard:23,reduced:13},
-  RO:{name:'Romania 🇷🇴',standard:19,reduced:9},
-  SE:{name:'Sweden 🇸🇪',standard:25,reduced:12},
-  SI:{name:'Slovenia 🇸🇮',standard:22,reduced:9.5},
-  SK:{name:'Slovakia 🇸🇰',standard:23,reduced:10},
-  GB:{name:'United Kingdom 🇬🇧',standard:20,reduced:5},
-  NO:{name:'Norway 🇳🇴',standard:25,reduced:15},
-  CH:{name:'Switzerland 🇨🇭',standard:8.1,reduced:2.6}
+  AT:{name:'Austria',standard:20,reduced:10},
+  BE:{name:'Belgium',standard:21,reduced:6},
+  BG:{name:'Bulgaria',standard:20,reduced:9},
+  CY:{name:'Cyprus',standard:19,reduced:5},
+  CZ:{name:'Czech Republic',standard:21,reduced:12},
+  DE:{name:'Germany',standard:19,reduced:7},
+  DK:{name:'Denmark',standard:25,reduced:0},
+  EE:{name:'Estonia',standard:22,reduced:9},
+  ES:{name:'Spain',standard:21,reduced:10},
+  FI:{name:'Finland',standard:25.5,reduced:14},
+  FR:{name:'France',standard:20,reduced:10},
+  GR:{name:'Greece',standard:24,reduced:13},
+  HR:{name:'Croatia',standard:25,reduced:13},
+  HU:{name:'Hungary',standard:27,reduced:18},
+  IE:{name:'Ireland',standard:23,reduced:13.5},
+  IT:{name:'Italy',standard:22,reduced:10},
+  LT:{name:'Lithuania',standard:21,reduced:9},
+  LU:{name:'Luxembourg',standard:17,reduced:8},
+  LV:{name:'Latvia',standard:21,reduced:12},
+  MT:{name:'Malta',standard:18,reduced:5},
+  NL:{name:'Netherlands',standard:21,reduced:9},
+  PL:{name:'Poland',standard:23,reduced:8},
+  PT:{name:'Portugal',standard:23,reduced:13},
+  RO:{name:'Romania',standard:19,reduced:9},
+  SE:{name:'Sweden',standard:25,reduced:12},
+  SI:{name:'Slovenia',standard:22,reduced:9.5},
+  SK:{name:'Slovakia',standard:23,reduced:10},
+  GB:{name:'United Kingdom',standard:20,reduced:5},
+  NO:{name:'Norway',standard:25,reduced:15},
+  CH:{name:'Switzerland',standard:8.1,reduced:2.6}
 };
 
 function getVatRate(countryCode, productType) {
-  const c = EU_COUNTRIES[countryCode];
+  var c = EU_COUNTRIES[countryCode];
   if (!c) return 0;
   return c.standard;
 }
 
-const usSelect = document.getElementById('usState');
-Object.entries(US_STATES).sort((a,b)=>a[1].name.localeCompare(b[1].name)).forEach(([k,v])=>{
-  const o = document.createElement('option'); o.value = k; o.textContent = v.name;
+var usSelect = document.getElementById('usState');
+Object.keys(US_STATES).sort(function(a,b){return US_STATES[a].name.localeCompare(US_STATES[b].name);}).forEach(function(k){
+  var o = document.createElement('option'); o.value = k; o.textContent = US_STATES[k].name;
   if (k === 'CA') o.selected = true;
   usSelect.appendChild(o);
 });
 
-const euSelect = document.getElementById('euCountry');
-Object.entries(EU_COUNTRIES).sort((a,b)=>a[1].name.localeCompare(b[1].name)).forEach(([k,v])=>{
-  const o = document.createElement('option'); o.value = k; o.textContent = v.name;
+var euSelect = document.getElementById('euCountry');
+Object.keys(EU_COUNTRIES).sort(function(a,b){return EU_COUNTRIES[a].name.localeCompare(EU_COUNTRIES[b].name);}).forEach(function(k){
+  var o = document.createElement('option'); o.value = k; o.textContent = EU_COUNTRIES[k].name;
   if (k === 'DE') o.selected = true;
   euSelect.appendChild(o);
 });
 
-let currentRegion = 'us';
-let currentType = 'physical';
+var currentRegion = 'us';
+var currentType = 'physical';
 
 function switchRegion(r, el) {
   currentRegion = r;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   el.classList.add('active');
   document.getElementById('us-fields').style.display = r === 'us' ? 'grid' : 'none';
   document.getElementById('eu-fields').style.display = r === 'eu' ? 'grid' : 'none';
@@ -314,7 +302,7 @@ function switchRegion(r, el) {
 }
 
 function selectType(el) {
-  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.pill').forEach(function(p){p.classList.remove('active');});
   el.classList.add('active');
   currentType = el.dataset.type;
   calculate();
@@ -325,283 +313,129 @@ document.getElementById('b2b').addEventListener('change', function() {
   calculate();
 });
 
-function switchApiTab(name, el) {
-  document.querySelectorAll('.api-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.api-pane').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('pane-' + name).classList.add('active');
-}
-
 function calculate() {
-  const price    = parseFloat(document.getElementById('unitPrice').value) || 0;
-  const qty      = parseInt(document.getElementById('quantity').value) || 1;
-  const shipping = parseFloat(document.getElementById('shipping').value) || 0;
-  const discount = parseFloat(document.getElementById('discount').value) || 0;
-  const subtotal = price * qty;
-  const taxable  = Math.max(0, subtotal - discount);
+  var price    = parseFloat(document.getElementById('unitPrice').value) || 0;
+  var qty      = parseInt(document.getElementById('quantity').value) || 1;
+  var shipping = parseFloat(document.getElementById('shipping').value) || 0;
+  var discount = parseFloat(document.getElementById('discount').value) || 0;
+  var subtotal = price * qty;
+  var taxable  = Math.max(0, subtotal - discount);
 
-  let taxAmount = 0, taxRate = 0, breakdown = {};
-  let isB2B = false, countryCode = '', stateName = '';
+  var taxAmount = 0, taxRate = 0, breakdown = {};
+  var isB2B = false, countryCode = '';
 
   if (currentRegion === 'us') {
-    const stateCode = document.getElementById('usState').value;
-    const s = US_STATES[stateCode];
+    var stateCode = document.getElementById('usState').value;
+    var s = US_STATES[stateCode];
     if (s) {
-      const stateRate  = s.state;
-      const countyRate = s.county;
-      const total = (stateRate + countyRate) / 100;
-      taxRate = stateRate + countyRate;
-      taxAmount = taxable * total;
-      taxAmount += shipping * total;
-      stateName = s.name;
+      var combined = (s.state + s.county) / 100;
+      taxRate = s.state + s.county;
+      taxAmount = (taxable + shipping) * combined;
       breakdown = {
-        'State Tax': `${stateRate}%`,
-        'County/City Avg': `${countyRate}%`,
-        'Total Rate': `${taxRate.toFixed(2)}%`,
-        'Tax Base': `$${(taxable + shipping).toFixed(2)}`
+        'State Tax': s.state + '%',
+        'County Avg': s.county + '%',
+        'Total Rate': taxRate.toFixed(2) + '%',
+        'Tax Base': '$' + (taxable + shipping).toFixed(2)
       };
     }
   } else {
     countryCode = document.getElementById('euCountry').value;
     isB2B = document.getElementById('b2b').value === 'yes';
-    const c = EU_COUNTRIES[countryCode];
+    var c = EU_COUNTRIES[countryCode];
     if (c && !isB2B) {
       taxRate = getVatRate(countryCode, currentType);
-      taxAmount = taxable * (taxRate / 100);
-      taxAmount += shipping * (taxRate / 100);
+      taxAmount = (taxable + shipping) * (taxRate / 100);
       breakdown = {
-        'VAT Rate': `${taxRate}%`,
-        'VAT Base': `$${(taxable + shipping).toFixed(2)}`,
+        'VAT Rate': taxRate + '%',
+        'VAT Base': '$' + (taxable + shipping).toFixed(2),
         'Regime': currentType === 'digital' ? 'OSS (digital goods)' : 'Standard VAT',
         'B2B': 'No — charge VAT'
       };
     } else if (isB2B) {
-      breakdown = {
-        'VAT': '0% (reverse charge)',
-        'Buyer provides': 'Valid VAT number',
-        'Regime': 'B2B Reverse Charge',
-        'Filing': 'EC Sales List required'
-      };
+      breakdown = { 'VAT': '0% (reverse charge)', 'Regime': 'B2B Reverse Charge' };
     }
   }
 
-  const total = taxable + shipping + taxAmount;
+  var total = taxable + shipping + taxAmount;
 
-  const badge = document.getElementById('taxBadge');
+  var badge = document.getElementById('taxBadge');
   if (currentRegion === 'us') {
-    badge.innerHTML = `<div class="tax-badge us">🇺🇸 US Sales Tax · ${document.getElementById('usState').value} · ${taxRate.toFixed(2)}%</div>`;
+    badge.innerHTML = '<div class="tax-badge us">🇺🇸 US Sales Tax · ' + document.getElementById('usState').value + ' · ' + taxRate.toFixed(2) + '%</div>';
   } else if (isB2B) {
-    badge.innerHTML = `<div class="tax-badge zero">✅ B2B Reverse Charge · 0% VAT</div>`;
+    badge.innerHTML = '<div class="tax-badge zero">✅ B2B Reverse Charge · 0% VAT</div>';
   } else {
-    badge.innerHTML = `<div class="tax-badge eu">🇪🇺 EU VAT · ${document.getElementById('euCountry').value} · ${taxRate}%</div>`;
+    badge.innerHTML = '<div class="tax-badge eu">🇪🇺 EU VAT · ' + document.getElementById('euCountry').value + ' · ' + taxRate + '%</div>';
   }
 
-  document.getElementById('resultRows').innerHTML = `
-    <div class="result-row"><span class="label">Subtotal (${qty}× item)</span><span class="val">$${subtotal.toFixed(2)}</span></div>
-    ${discount > 0 ? `<div class="result-row"><span class="label">Discount</span><span class="val" style="color:var(--green)">-$${discount.toFixed(2)}</span></div>` : ''}
-    <div class="result-row"><span class="label">Taxable Amount</span><span class="val">$${taxable.toFixed(2)}</span></div>
-    <div class="result-row"><span class="label">Shipping</span><span class="val">$${shipping.toFixed(2)}</span></div>
-    <div class="result-row tax"><span class="label">${currentRegion === 'us' ? 'Sales Tax' : (isB2B ? 'VAT (Reverse Charge)' : 'VAT')}</span><span class="val">${isB2B ? '$0.00' : '$' + taxAmount.toFixed(2)}</span></div>
-    <div class="result-row total"><span class="label">Order Total</span><span class="val">$${total.toFixed(2)}</span></div>
-  `;
+  var rows = '<div class="result-row"><span class="label">Subtotal (' + qty + '× item)</span><span class="val">$' + subtotal.toFixed(2) + '</span></div>';
+  if (discount > 0) rows += '<div class="result-row"><span class="label">Discount</span><span class="val" style="color:var(--green)">-$' + discount.toFixed(2) + '</span></div>';
+  rows += '<div class="result-row"><span class="label">Taxable Amount</span><span class="val">$' + taxable.toFixed(2) + '</span></div>';
+  rows += '<div class="result-row"><span class="label">Shipping</span><span class="val">$' + shipping.toFixed(2) + '</span></div>';
+  rows += '<div class="result-row tax"><span class="label">' + (currentRegion === 'us' ? 'Sales Tax' : (isB2B ? 'VAT (Rev.Chg)' : 'VAT')) + '</span><span class="val">' + (isB2B ? '$0.00' : '$' + taxAmount.toFixed(2)) + '</span></div>';
+  rows += '<div class="result-row total"><span class="label">Order Total</span><span class="val">$' + total.toFixed(2) + '</span></div>';
+  document.getElementById('resultRows').innerHTML = rows;
 
-  // Render PayPal button with updated total
-  renderPayPalButton(total, productName, qty);
+  var bHtml = '';
+  for (var k in breakdown) {
+    bHtml += '<div class="breakdown-row"><span>' + k + '</span><span class="bval">' + breakdown[k] + '</span></div>';
+  }
+  document.getElementById('breakdown').innerHTML = '<div class="breakdown-title">Rate Breakdown</div>' + bHtml;
 
-  const bHtml = Object.entries(breakdown).map(([k,v]) =>
-    `<div class="breakdown-row"><span>${k}</span><span class="bval">${v}</span></div>`
-  ).join('');
-  document.getElementById('breakdown').innerHTML = `<div class="breakdown-title">Rate Breakdown</div>${bHtml}`;
-
-  document.getElementById('paypal-section').style.display = total > 0 ? 'block' : 'none';
-
-  updateApiPreviews({ price, qty, shipping, discount, subtotal, taxable, taxAmount, taxRate, total, isB2B, countryCode, stateName });
+  // Update PayPal section
+  renderPayPalButton(total);
 }
 
-function updateApiPreviews({ price, qty, shipping, discount, subtotal, taxable, taxAmount, taxRate, total, isB2B, countryCode, stateName }) {
-  const productName = document.getElementById('productName').value || 'Product';
+function renderPayPalButton(total) {
+  var el = document.getElementById('paypal-total');
+  if (el) el.textContent = '$' + total.toFixed(2);
+  var section = document.getElementById('paypal-section');
+  if (section) section.style.display = total > 0 ? 'block' : 'none';
+  // PayPal buttons rendered on page load below
+}
 
-  if (currentRegion === 'us') {
-    const stateCode = document.getElementById('usState').value;
-    const zip = document.getElementById('zipCode').value || '90210';
+// Load PayPal SDK dynamically and render buttons
+var paypalLoaded = false;
 
-    document.getElementById('apiRequest').innerHTML = highlight(JSON.stringify({
-      from: { country: 'CN', zip: '200000' },
-      to: { country: 'US', state: stateCode, zip },
-      amount: taxable,
-      shipping,
-      line_items: [{ quantity: qty, unit_price: price, product_tax_code: currentType === 'digital' ? 'SaaS' : '31000', description: productName }]
-    }, null, 2));
-
-    document.getElementById('apiResponse').innerHTML = highlight(JSON.stringify({
-      tax: {
-        order_total_amount: total,
-        shipping: shipping,
-        taxable_amount: taxable,
-        amount_to_collect: +taxAmount.toFixed(2),
-        rate: +(taxRate / 100).toFixed(4),
-        has_nexus: true,
-        freight_taxable: true,
-        tax_source: 'destination',
-        jurisdictions: { country: 'US', state: stateCode },
-        breakdown: {
-          state_taxable_amount: taxable,
-          state_tax_rate: +(US_STATES[stateCode]?.state / 100 || 0).toFixed(4),
-          state_tax_collectable: +((taxable * (US_STATES[stateCode]?.state || 0)) / 100).toFixed(2),
-          county_tax_rate: +(US_STATES[stateCode]?.county / 100 || 0).toFixed(4),
-          county_tax_collectable: +((taxable * (US_STATES[stateCode]?.county || 0)) / 100).toFixed(2)
-        }
+function loadPayPalSDK() {
+  if (paypalLoaded) return;
+  var s = document.createElement('script');
+  s.src = 'https://www.paypal.com/sdk/js?client-id=AVJ64pXVas3BtB-YrVVMFfCAZx2r2RlEjn0TwRtpGGNxqhhR-DRILDWX8gONSh-jSgunDQucOrVplXtm&currency=USD&intent=capture';
+  s.onload = function() {
+    paypalLoaded = true;
+    document.getElementById('paypal-loader').style.display = 'none';
+    paypal.Buttons({
+      createOrder: function() {
+        var totalEl = document.getElementById('paypal-total');
+        var amount = parseFloat((totalEl.textContent || '$10').replace('$','')) || 10;
+        return fetch('/api/paypal/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: amount, description: document.getElementById('productName').value || 'Order', quantity: parseInt(document.getElementById('quantity').value) || 1 })
+        }).then(function(r) { return r.json(); }).then(function(d) { if (!d.id) throw new Error('No order ID'); return d.id; });
+      },
+      onApprove: function(data) {
+        return fetch('/api/paypal/capture-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: data.orderID })
+        }).then(function(r) { return r.json(); }).then(function(det) {
+          document.getElementById('pp-status').innerHTML = '<div style="padding:12px;background:#eafaf1;border-radius:8px;text-align:center">✅ Payment successful!<br><small>Order: ' + det.id + '<br>Payer: ' + (det.payer.name.given_name || '') + ' ' + (det.payer.name.surname || '') + '</small></div>';
+        });
+      },
+      onError: function(err) {
+        document.getElementById('pp-status').innerHTML = '<div style="padding:12px;background:#fef0f0;border-radius:8px;text-align:center">❌ Payment failed. Check console.</div>';
+        console.error('PayPal Error', err);
       }
-    }, null, 2));
-
-    document.getElementById('apiAvalara').textContent =
-`const AvaTaxClient = require('avatax').AvaTaxClient;
-const client = new AvaTaxClient('MyApp', '1.0', 'localhost', 'sandbox')
-  .withSecurity({ username: 'YOUR_ACCOUNT_ID', password: 'YOUR_LICENSE_KEY' });
-
-const result = await client.createTransaction(null, {
-  type: 'SalesOrder',
-  companyCode: 'DEFAULT',
-  date: '${new Date().toISOString().split('T')[0]}',
-  customerCode: 'BUYER_001',
-  addresses: {
-    shipFrom: { line1: '1 Seller St', city: 'Shanghai', country: 'CN' },
-    shipTo:   { line1: '1 Buyer Ave', city: '${stateName}', region: '${document.getElementById('usState').value}', postalCode: '${document.getElementById('zipCode').value || '90210'}', country: 'US' }
-  },
-  lines: [{
-    number: '1', quantity: ${qty}, amount: ${taxable},
-    taxCode: '${currentType === 'digital' ? 'D0000000' : 'P0000000'}',
-    description: '${productName}'
-  }]
-});`;
-
-    document.getElementById('apiTaxjar').textContent =
-`const Taxjar = require('taxjar');
-const client = new Taxjar({ apiKey: 'YOUR_API_KEY' });
-
-const tax = await client.taxForOrder({
-  from_country: 'CN', from_zip: '200000',
-  to_country: 'US',   to_state: '${document.getElementById('usState').value}',
-  to_zip: '${document.getElementById('zipCode').value || '90210'}',
-  amount: ${taxable},
-  shipping: ${shipping},
-  line_items: [{
-    quantity: ${qty},
-    unit_price: ${price},
-    product_tax_code: '${currentType === 'digital' ? '19005' : ''}',
-    description: '${productName}'
-  }]
-});`;
-
-  } else {
-    const vatNum = document.getElementById('vatNum').value || 'DE123456789';
-
-    document.getElementById('apiRequest').innerHTML = highlight(JSON.stringify({
-      seller: { country: 'CN' },
-      buyer: { country: countryCode, vat_number: isB2B ? vatNum : null, type: isB2B ? 'B2B' : 'B2C' },
-      currency: 'USD',
-      amount: taxable,
-      shipping,
-      product_type: currentType,
-      line_items: [{ quantity: qty, unit_price: price, description: productName }]
-    }, null, 2));
-
-    document.getElementById('apiResponse').innerHTML = highlight(JSON.stringify({
-      calculation: {
-        subtotal: taxable,
-        shipping,
-        vat_rate: isB2B ? 0 : taxRate,
-        vat_amount: isB2B ? 0 : +taxAmount.toFixed(2),
-        total: +total.toFixed(2),
-        regime: isB2B ? 'reverse_charge' : (currentType === 'digital' ? 'OSS' : 'standard_vat'),
-        country: countryCode,
-        currency: 'USD',
-        filing_required: isB2B ? 'EC Sales List' : 'OSS / Local VAT return'
-      }
-    }, null, 2));
-
-    document.getElementById('apiAvalara').textContent =
-`const client = new AvaTaxClient(...)
-  .withSecurity({ username: 'YOUR_ACCOUNT_ID', password: 'YOUR_LICENSE_KEY' });
-
-const result = await client.createTransaction(null, {
-  type: 'SalesOrder',
-  companyCode: 'DEFAULT',
-  date: '${new Date().toISOString().split('T')[0]}',
-  customerCode: 'EU_BUYER_001',
-  ${isB2B ? `businessIdentificationNo: '${vatNum}',` : ''}
-  addresses: {
-    shipFrom: { country: 'CN' },
-    shipTo:   { country: '${countryCode}' }
-  },
-  lines: [{
-    number: '1', quantity: ${qty}, amount: ${taxable},
-    taxCode: '${currentType === 'digital' ? 'D0000000' : 'P0000000'}',
-    description: '${productName}'
-  }]
-});`;
-
-    document.getElementById('apiTaxjar').textContent =
-`const Quaderno = require('quaderno-node');
-const client   = new Quaderno({ apiKey: 'YOUR_KEY', accountName: 'YOUR_ACCOUNT' });
-
-const estimate = await client.receipts.calculate({
-  currency: 'USD',
-  po_number: 'ORDER-001',
-  country: '${countryCode}',
-  ${isB2B ? `tax_id: '${vatNum}',` : ''}
-  items: [{
-    description: '${productName}',
-    quantity: ${qty},
-    unit_price: ${price},
-    product_code: '${currentType === 'digital' ? 'eservice' : 'standard'}'
-  }]
-});`;
-  }
+    }).render('#paypal-button-container');
+  };
+  s.onerror = function() {
+    document.getElementById('paypal-loader').textContent = 'Failed to load PayPal. Check console.';
+  };
+  document.head.appendChild(s);
 }
 
-function highlight(json) {
-  return json
-    .replace(/("[\w\s_]+")\s*:/g, '<span class="key">$1</span>:')
-    .replace(/:\s*(".*?")/g, ': <span class="str">$1</span>')
-    .replace(/:\s*(\d+\.?\d*)/g, ': <span class="num">$1</span>')
-    .replace(/:\s*(true|false|null)/g, ': <span class="kw">$1</span>');
-}
-
-function renderPayPalButton(total, productName, qty) {
-  var container = document.getElementById('paypal-button-container');
-  var amountEl = document.getElementById('paypalAmount');
-  if (!container) return;
-  if (amountEl) amountEl.textContent = '$' + total.toFixed(2);
-  container.innerHTML = '';
-  if (total <= 0) return;
-
-  // Retry until PayPal SDK is ready
-  if (typeof paypal === 'undefined' || typeof paypal.Buttons !== 'function') {
-    setTimeout(function() { renderPayPalButton(total, productName, qty); }, 300);
-    return;
-  }
-
-  paypal.Buttons({
-    createOrder: function(data, actions) {
-      return actions.order.create({
-        purchase_units: [{
-          description: productName,
-          amount: { currency_code: 'USD', value: total.toFixed(2) }
-        }]
-      });
-    },
-    onApprove: function(data, actions) {
-      return actions.order.capture().then(function(details) {
-        alert('Payment successful!\n\nOrder ID: ' + details.id + '\nPayer: ' + (details.payer.name.given_name || '') + ' ' + (details.payer.name.surname || ''));
-      });
-    },
-    onError: function(err) {
-      console.error('PayPal Checkout Error', err);
-      alert('Payment failed. Check console for details.');
-    }
-  }).render('#paypal-button-container');
-}
+// Load SDK after page load
+window.addEventListener('load', loadPayPalSDK);
 
 calculate();
 </script>

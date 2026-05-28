@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Ben Li">
+<title>Payment Successful - Tax Calculator Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue: #0070ba;
+    --blue-dark: #003087;
+    --green: #00a651;
+    --red: #c0392b;
+    --gray: #f5f7fa;
+    --border: #dde3ed;
+    --text: #2c3e50;
+    --muted: #7f8c9a;
+    --radius: 10px;
+    --shadow: 0 2px 16px rgba(0,0,0,0.09);
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #eef2f7; color: var(--text); min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .container {
+    max-width: 560px; width: 100%; margin: 40px 20px;
+    animation: fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  .card {
+    background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 0;
+    overflow: hidden;
+  }
+  .card-header {
+    background: linear-gradient(135deg, var(--blue-dark), var(--blue));
+    color: #fff; padding: 28px 32px; text-align: center;
+  }
+  .card-header .check {
+    font-size: 3rem; margin-bottom: 6px; display: block;
+  }
+  .card-header h1 {
+    font-size: 1.3rem; font-weight: 700; margin-bottom: 4px;
+  }
+  .card-header p {
+    font-size: 0.85rem; opacity: 0.85;
+  }
+  .card-body {
+    padding: 24px 32px;
+  }
+  .section-title {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+  .row {
+    display: flex; justify-content: space-between; padding: 8px 0;
+    border-bottom: 1px solid var(--gray); font-size: 0.92rem;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .label { color: var(--muted); }
+  .row .val { font-weight: 600; text-align: right; }
+  .row.total {
+    font-weight: 700; font-size: 1.1rem; padding: 14px 0; margin-top: 4px;
+    border-top: 2px solid var(--blue);
+  }
+  .row.total .val { color: var(--blue); font-size: 1.2rem; }
+  .row.tax .val { color: var(--red); }
+  .row.green .val { color: var(--green); }
+  .divider { height: 1px; background: var(--border); margin: 18px 0; }
+  .info-box {
+    background: #f8faff; border: 1px solid #dde8f5; border-radius: 8px;
+    padding: 14px 16px; margin-top: 14px;
+  }
+  .info-row {
+    display: flex; justify-content: space-between; padding: 4px 0;
+    font-size: 0.82rem; color: var(--muted);
+  }
+  .info-row .ival { color: var(--text); font-weight: 600; font-family: monospace; font-size: 0.8rem; }
+  .banner {
+    background: var(--gray); border-radius: 8px; padding: 16px;
+    text-align: center; margin-top: 20px;
+  }
+  .banner p { font-size: 0.82rem; color: var(--muted); margin-bottom: 12px; }
+  .banner .btn {
+    display: inline-block; padding: 10px 24px; background: var(--blue);
+    color: #fff; text-decoration: none; border-radius: 7px;
+    font-weight: 700; font-size: 0.9rem; transition: background 0.2s;
+  }
+  .banner .btn:hover { background: var(--blue-dark); }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 700;
+  }
+  .badge.success { background: #eafaf1; color: var(--green); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="card-header">
+      <span class="check">✅</span>
+      <h1>Payment Successful</h1>
+      <p>Your transaction has been completed</p>
+    </div>
+    <div class="card-body">
+
+      <div class="section-title">Order Summary</div>
+      <div class="row"><span class="label">Product</span><span class="val" id="s-product">—</span></div>
+      <div class="row"><span class="label">Quantity</span><span class="val" id="s-qty">—</span></div>
+      <div class="row"><span class="label">Unit Price</span><span class="val" id="s-price">—</span></div>
+      <div class="row"><span class="label">Subtotal</span><span class="val" id="s-subtotal">—</span></div>
+      <div class="row"><span class="label">Shipping</span><span class="val" id="s-shipping">—</span></div>
+      <div class="row"><span class="label">Discount</span><span class="val green" id="s-discount">—</span></div>
+      <div class="row tax"><span class="label">Tax (VAT/Sales Tax)</span><span class="val" id="s-tax">—</span></div>
+      <div class="row total"><span class="label">Order Total</span><span class="val" id="s-total">—</span></div>
+
+      <div class="divider"></div>
+
+      <div class="section-title">Payment Details</div>
+      <div class="info-box">
+        <div class="info-row"><span>PayPal Order ID</span><span class="ival" id="s-orderId">—</span></div>
+        <div class="info-row"><span>Payment Status</span><span class="ival" id="s-status">—</span></div>
+        <div class="info-row"><span>Payer Name</span><span class="ival" id="s-payer">—</span></div>
+        <div class="info-row"><span>Payer Email</span><span class="ival" id="s-payerEmail">—</span></div>
+        <div class="info-row"><span>Currency</span><span class="ival" id="s-currency">USD</span></div>
+        <div class="info-row"><span>Timestamp</span><span class="ival" id="s-timestamp">—</span></div>
+        <div class="info-row"><span>Region</span><span class="ival" id="s-region">—</span></div>
+      </div>
+
+      <div class="banner">
+        <p>This is a sandbox demo. No real money has been charged.</p>
+        <a href="/" class="btn">← Back to Calculator</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var p = new URLSearchParams(window.location.search);
+  var price = parseFloat(p.get('price')) || 0;
+  var qty   = parseInt(p.get('qty')) || 1;
+  var shipping = parseFloat(p.get('shipping')) || 0;
+  var discount = parseFloat(p.get('discount')) || 0;
+  var tax   = parseFloat(p.get('tax')) || 0;
+  var total = parseFloat(p.get('total')) || 0;
+  var subtotal = price * qty;
+
+  document.getElementById('s-product').textContent = p.get('product') || '—';
+  document.getElementById('s-qty').textContent = qty;
+  document.getElementById('s-price').textContent = '$' + price.toFixed(2);
+  document.getElementById('s-subtotal').textContent = '$' + subtotal.toFixed(2);
+  document.getElementById('s-shipping').textContent = '$' + shipping.toFixed(2);
+  document.getElementById('s-discount').textContent = discount > 0 ? '-$' + discount.toFixed(2) : '$0.00';
+  document.getElementById('s-tax').textContent = '$' + tax.toFixed(2);
+  document.getElementById('s-total').textContent = '$' + total.toFixed(2);
+
+  document.getElementById('s-orderId').textContent = p.get('orderId') || '—';
+  document.getElementById('s-status').innerHTML = '<span class="badge success">' + (p.get('status') || '—') + '</span>';
+  document.getElementById('s-payer').textContent = p.get('payer') || '—';
+  document.getElementById('s-payerEmail').textContent = p.get('payerEmail') || '—';
+  document.getElementById('s-currency').textContent = p.get('currency') || 'USD';
+  document.getElementById('s-timestamp').textContent = p.get('timestamp') ? new Date(p.get('timestamp')).toLocaleString() : '—';
+  document.getElementById('s-region').textContent = p.get('region') === 'us' ? '🇺🇸 United States' : (p.get('region') === 'eu' ? '🇪🇺 Europe / UK' : '—');
+})();
+</script>
+</body>
+</html>

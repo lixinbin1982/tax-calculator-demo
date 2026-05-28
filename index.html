@@ -419,7 +419,23 @@ function loadPayPalSDK() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ orderId: data.orderID })
         }).then(function(r) { return r.json(); }).then(function(det) {
-          document.getElementById('pp-status').innerHTML = '<div style="padding:12px;background:#eafaf1;border-radius:8px;text-align:center">✅ Payment successful!<br><small>Order: ' + det.id + '<br>Payer: ' + (det.payer.name.given_name || '') + ' ' + (det.payer.name.surname || '') + '</small></div>';
+          // Gather order details for summary page
+          var params = new URLSearchParams();
+          params.set('orderId', det.id);
+          params.set('status', det.status);
+          params.set('payer', (det.payer && det.payer.name) ? (det.payer.name.given_name || '') + ' ' + (det.payer.name.surname || '') : '');
+          params.set('payerEmail', (det.payer && det.payer.email_address) || '');
+          params.set('product', document.getElementById('productName').value || 'Order');
+          params.set('qty', parseInt(document.getElementById('quantity').value) || 1);
+          params.set('price', parseFloat(document.getElementById('unitPrice').value) || 0);
+          params.set('shipping', parseFloat(document.getElementById('shipping').value) || 0);
+          params.set('discount', parseFloat(document.getElementById('discount').value) || 0);
+          params.set('tax', parseFloat(det.purchase_units && det.purchase_units[0] && det.purchase_units[0].amount ? (det.purchase_units[0].amount.breakdown ? (det.purchase_units[0].amount.breakdown.tax_total ? det.purchase_units[0].amount.breakdown.tax_total.value : '0') : '0') : '0'));
+          params.set('total', det.purchase_units && det.purchase_units[0] && det.purchase_units[0].amount ? det.purchase_units[0].amount.value : '0');
+          params.set('region', currentRegion);
+          params.set('currency', 'USD');
+          params.set('timestamp', new Date().toISOString());
+          window.location.href = '/success.html?' + params.toString();
         });
       },
       onError: function(err) {

@@ -114,9 +114,11 @@
       <div class="row"><span class="label">Quantity</span><span class="val" id="s-qty">—</span></div>
       <div class="row"><span class="label">Unit Price</span><span class="val" id="s-price">—</span></div>
       <div class="row"><span class="label">Subtotal</span><span class="val" id="s-subtotal">—</span></div>
-      <div class="row"><span class="label">Shipping</span><span class="val" id="s-shipping">—</span></div>
       <div class="row"><span class="label">Discount</span><span class="val green" id="s-discount">—</span></div>
-      <div class="row tax"><span class="label">Tax (VAT/Sales Tax)</span><span class="val" id="s-tax">—</span></div>
+      <div class="row"><span class="label">Taxable Amount</span><span class="val" id="s-taxable">—</span></div>
+      <div class="row"><span class="label">Shipping</span><span class="val" id="s-shipping">—</span></div>
+      <div class="row tax"><span class="label">Tax</span><span class="val" id="s-tax">—</span></div>
+      <div class="row"><span class="label">Tax Rate</span><span class="val" id="s-taxRate">—</span></div>
       <div class="row total"><span class="label">Order Total</span><span class="val" id="s-total">—</span></div>
 
       <div class="divider"></div>
@@ -146,19 +148,23 @@
   var p = new URLSearchParams(window.location.search);
   var price = parseFloat(p.get('price')) || 0;
   var qty   = parseInt(p.get('qty')) || 1;
+  var subtotal = parseFloat(p.get('subtotal')) || (price * qty);
   var shipping = parseFloat(p.get('shipping')) || 0;
   var discount = parseFloat(p.get('discount')) || 0;
+  var taxable  = parseFloat(p.get('taxable')) || Math.max(0, subtotal - discount);
   var tax   = parseFloat(p.get('tax')) || 0;
+  var taxRate  = p.get('taxRate') || '0%';
   var total = parseFloat(p.get('total')) || 0;
-  var subtotal = price * qty;
 
   document.getElementById('s-product').textContent = p.get('product') || '—';
   document.getElementById('s-qty').textContent = qty;
   document.getElementById('s-price').textContent = '$' + price.toFixed(2);
   document.getElementById('s-subtotal').textContent = '$' + subtotal.toFixed(2);
-  document.getElementById('s-shipping').textContent = '$' + shipping.toFixed(2);
   document.getElementById('s-discount').textContent = discount > 0 ? '-$' + discount.toFixed(2) : '$0.00';
+  document.getElementById('s-taxable').textContent = '$' + taxable.toFixed(2);
+  document.getElementById('s-shipping').textContent = '$' + shipping.toFixed(2);
   document.getElementById('s-tax').textContent = '$' + tax.toFixed(2);
+  document.getElementById('s-taxRate').textContent = taxRate;
   document.getElementById('s-total').textContent = '$' + total.toFixed(2);
 
   document.getElementById('s-orderId').textContent = p.get('orderId') || '—';
@@ -166,8 +172,8 @@
   document.getElementById('s-payer').textContent = p.get('payer') || '—';
   document.getElementById('s-payerEmail').textContent = p.get('payerEmail') || '—';
   document.getElementById('s-currency').textContent = p.get('currency') || 'USD';
-  document.getElementById('s-timestamp').textContent = p.get('timestamp') ? new Date(p.get('timestamp')).toLocaleString() : '—';
-  document.getElementById('s-region').textContent = p.get('region') === 'us' ? '🇺🇸 United States' : (p.get('region') === 'eu' ? '🇪🇺 Europe / UK' : '—');
+  document.getElementById('s-timestamp').textContent = p.get('timestamp') || '—';
+  document.getElementById('s-region').textContent = p.get('region') || '—';
 })();
 </script>
 </body>

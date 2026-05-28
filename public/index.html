@@ -419,22 +419,47 @@ function loadPayPalSDK() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ orderId: data.orderID })
         }).then(function(r) { return r.json(); }).then(function(det) {
-          // Gather order details for summary page
+          // Use locally computed values for accuracy
+          var price = parseFloat((document.getElementById('unitPrice') || {}).value) || 0;
+          var qty   = parseInt((document.getElementById('quantity') || {}).value) || 1;
+          var ship  = parseFloat((document.getElementById('shipping') || {}).value) || 0;
+          var disc  = parseFloat((document.getElementById('discount') || {}).value) || 0;
+          var prod  = (document.getElementById('productName') || {}).value || 'Order';
+          var subtotal = price * qty;
+          var taxable = Math.max(0, subtotal - disc);
+          var taxAmt = 0, taxRate = 0;
+          if (currentRegion === 'us') {
+            var s = document.getElementById('usState');
+            taxRate = ((US_STATES[s.value] || {}).state || 0) + ((US_STATES[s.value] || {}).county || 0);
+            taxAmt = (taxable + ship) * (taxRate / 100);
+          } else if (currentRegion === 'eu') {
+            var isB2B = (document.getElementById('b2b') || {}).value === 'yes';
+            if (!isB2B) {
+              var cc = (document.getElementById('euCountry') || {}).value;
+              taxRate = (EU_COUNTRIES[cc] || {}).standard || 0;
+              taxAmt = (taxable + ship) * (taxRate / 100);
+            }
+          }
+          var total = taxable + ship + taxAmt;
+
           var params = new URLSearchParams();
-          params.set('orderId', det.id);
-          params.set('status', det.status);
-          params.set('payer', (det.payer && det.payer.name) ? (det.payer.name.given_name || '') + ' ' + (det.payer.name.surname || '') : '');
+          params.set('orderId', det.id || '');
+          params.set('status', det.status || 'COMPLETED');
+          params.set('payer', ((det.payer && det.payer.name) ? (det.payer.name.given_name || '') + ' ' + (det.payer.name.surname || '') : '').trim() || (det.payer && det.payer.email_address) || '');
           params.set('payerEmail', (det.payer && det.payer.email_address) || '');
-          params.set('product', document.getElementById('productName').value || 'Order');
-          params.set('qty', parseInt(document.getElementById('quantity').value) || 1);
-          params.set('price', parseFloat(document.getElementById('unitPrice').value) || 0);
-          params.set('shipping', parseFloat(document.getElementById('shipping').value) || 0);
-          params.set('discount', parseFloat(document.getElementById('discount').value) || 0);
-          params.set('tax', parseFloat(det.purchase_units && det.purchase_units[0] && det.purchase_units[0].amount ? (det.purchase_units[0].amount.breakdown ? (det.purchase_units[0].amount.breakdown.tax_total ? det.purchase_units[0].amount.breakdown.tax_total.value : '0') : '0') : '0'));
-          params.set('total', det.purchase_units && det.purchase_units[0] && det.purchase_units[0].amount ? det.purchase_units[0].amount.value : '0');
-          params.set('region', currentRegion);
+          params.set('product', prod);
+          params.set('qty', qty);
+          params.set('price', price.toFixed(2));
+          params.set('subtotal', subtotal.toFixed(2));
+          params.set('shipping', ship.toFixed(2));
+          params.set('discount', disc.toFixed(2));
+          params.set('taxable', taxable.toFixed(2));
+          params.set('tax', taxAmt.toFixed(2));
+          params.set('taxRate', taxRate.toFixed(2) + '%');
+          params.set('total', total.toFixed(2));
+          params.set('region', currentRegion === 'us' ? '🇺🇸 United States (' + (document.getElementById('usState').value || '') + ')' : (currentRegion === 'eu' ? '🇪🇺 Europe/' + ((document.getElementById('euCountry') || {}).value || '') : ''));
           params.set('currency', 'USD');
-          params.set('timestamp', new Date().toISOString());
+          params.set('timestamp', new Date().toLocaleString());
           window.location.href = '/success.html?' + params.toString();
         });
       },

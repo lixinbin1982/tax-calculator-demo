@@ -568,40 +568,55 @@ function highlight(json) {
     .replace(/:\s*(true|false|null)/g, ': <span class="kw">$1</span>');
 }
 
+var payPalSdkReady = false;
+
+// Wait for PayPal SDK to fully load
+function waitForPayPal(callback) {
+  if (typeof paypal !== 'undefined' && typeof paypal.Buttons === 'function') {
+    payPalSdkReady = true;
+    callback();
+  } else if (!payPalSdkReady) {
+    setTimeout(function() { waitForPayPal(callback); }, 200);
+  }
+}
+
 function renderPayPalButton(total, productName, qty) {
-  const container = document.getElementById('paypal-button-container');
-  const amountEl = document.getElementById('paypalAmount');
+  var container = document.getElementById('paypal-button-container');
+  var amountEl = document.getElementById('paypalAmount');
   if (!container) return;
   if (amountEl) amountEl.textContent = '$' + total.toFixed(2);
   container.innerHTML = '';
+  if (total <= 0) return;
 
-  const paypalSdk = window.paypal;
-  if (total <= 0 || typeof paypalSdk === 'undefined' || typeof paypalSdk.Buttons !== 'function') {
-    return;
-  }
+  waitForPayPal(function() {
+    if (container.innerHTML !== '') return; // already rendered
 
-  paypalSdk.Buttons({
-    createOrder: function() {
-      return fetch('/api/paypal/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: total, description: productName, quantity: qty })
-      }).then(function(r) { return r.json(); }).then(function(data) { return data.id; });
-    },
-    onApprove: function(data) {
-      return fetch('/api/paypal/capture-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: data.orderID })
-      }).then(function(r) { return r.json(); }).then(function(details) {
-        alert('Payment successful!\n\nOrder ID: ' + details.id + '\nPayer: ' + (details.payer.name.given_name || '') + ' ' + (details.payer.name.surname || ''));
-      });
-    },
-    onError: function(err) {
-      console.error('PayPal Checkout Error', err);
-      alert('Payment failed. Check console for details.');
-    }
-  }).render('#paypal-button-container');
+    paypal.Buttons({
+      createOrder: function() {
+        return fetch('/api/paypal/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: total, description: productName, quantity: qty })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          if (!data.id) throw new Error('No order ID returned');
+          return data.id;
+        });
+      },
+      onApprove: function(data) {
+        return fetch('/api/paypal/capture-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: data.orderID })
+        }).then(function(r) { return r.json(); }).then(function(details) {
+          alert('Payment successful!\n\nOrder ID: ' + details.id + '\nPayer: ' + (details.payer.name.given_name || '') + ' ' + (details.payer.name.surname || ''));
+        });
+      },
+      onError: function(err) {
+        console.error('PayPal Checkout Error', err);
+        alert('Payment failed. Check console for details.');
+      }
+    }).render('#paypal-button-container');
+  });
 }
 
 calculate();

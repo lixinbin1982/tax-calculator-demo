@@ -1,6 +1,6 @@
 const AVALARA_ACCOUNT_ID = '2006562118';
 const AVALARA_LICENSE_KEY = '3308DB6437C4D264';
-const AVALARA_BASE = 'https://sandbox-rest.avatax.com/api/v2';
+const AVALARA_BASE = 'https://rest.avatax.com/api/v2';
 
 // Calculate tax via Avalara AvaTax
 app.post('/api/avatax/calculate', async (req, res) => {
